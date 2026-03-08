@@ -1,25 +1,26 @@
-// Setting the clokc
-function updateTime() {
-    const now = new Date
-    document.getElementById('clock').textContent =
-        now.toLocaleTimeString('en-US', { hour12: false })
+
+
+//  setting clock 
+function updateClock() {
+  const now = new Date()
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US', { hour12: false })
 }
+setInterval(updateClock, 1000)
+updateClock()
 
-(updateTime, 1000)
-updareClock()
-
-// Setting the tap swiccing
+// setting the tab switching 
 document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const target = tab.dataset.target
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
-        tab.classList.add('active')
-        document.getElementById(target + '-panel').classList.add('active')
-    })
-})
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+    tab.classList.add('active');
+    document.getElementById(target + '-panel').classList.add('active')
+  });
+});
 
-// setting the AI markdown rendering
+// concettign the markdown rendering for the chat and report
 function renderMd(text) {
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -36,78 +37,81 @@ function renderMd(text) {
     .replace(/\n/g, '<br>');
 }
 
-// settign sending messages to the server
-function appendMessage(roler, conrent) {
-    const continer = document.createElement('messages')
-    const wrap = document.createElement('div')
-    wrap.className = `message ${roler}`
-    const avatar = document.createElement('div')
-    avatar.className = 'avatar'
-     avatar.textContent = role == 'assistant' ? 'JAR' : 'YOU'
+// setting  chat message 
+function appendMessage(role, content) {
+  const container = document.getElementById('messages')
 
-     const body = document.createElement('div')
-        body.className = 'msg-body'
-        const label = 'msg-label'
-        label.textContent = role === 'assistant' ? 'J.A.R.V.I.S' : 'OPERATOR'
-        
-  const bubble = document.createElement('div');
+  const wrap = document.createElement('div')
+  wrap.className = `message ${role}`
+
+  const avatar = document.createElement('div')
+  avatar.className = 'msg-avatar';
+  avatar.textContent = role === 'assistant' ? 'JAR' : 'YOU'
+
+  const body = document.createElement('div')
+  body.className = 'msg-body';
+
+  const label = document.createElement('div')
+  label.className = 'msg-label';
+  label.textContent = role === 'assistant' ? 'J.A.R.V.I.S' : 'OPERATOR'
+
+  const bubble = document.createElement('div')
   bubble.className = 'msg-bubble';
-  bubble.innerHTML = renderMd(content);
+  bubble.innerHTML = renderMd(content)
 
-  body.appendChild(label);
-  body.appendChild(bubble);
+  body.appendChild(label)
+  body.appendChild(bubble)
 
   if (role === 'assistant') {
-    const btn = document.createElement('button');
-    btn.className = 'speak-btn';
-    btn.textContent = '▶ SPEAK';
+    const btn = document.createElement('button')
+    btn.className = 'speak-btn'
+    btn.textContent = '▶ SPEAK'
     btn.dataset.text = content;
-    btn.addEventListener('click', () => speakText(btn));
-    body.appendChild(btn);
+    btn.addEventListener('click', () => speakText(btn))
+    body.appendChild(btn)
   }
 
-  wrap.appendChild(avatar);
-  wrap.appendChild(body);
-  container.appendChild(wrap);
-  container.scrollTop = container.scrollHeight;
+  wrap.appendChild(avatar)
+  wrap.appendChild(body)
+  container.appendChild(wrap)
+  container.scrollTop = container.scrollHeight
 }
 
-
-// Setting the agent
+// ── Typing indicator ans setting the agernt ───────────────────────────────
 function showTyping() {
-  const container = document.getElementById('messages');
-  const wrap = document.createElement('div');
-  wrap.className = 'message assistant';
+  const container = document.getElementById('messages')
+  const wrap = document.createElement('div')
+  wrap.className = 'message assistant'
   wrap.id = 'typing-wrap';
 
-  const avatar = document.createElement('div');
+  const avatar = document.createElement('div')
   avatar.className = 'msg-avatar';
   avatar.textContent = 'JAR';
 
-  const body = document.createElement('div');
+  const body = document.createElement('div')
   body.className = 'msg-body';
 
-  const bubble = document.createElement('div');
+  const bubble = document.createElement('div')
   bubble.className = 'msg-bubble';
-  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>'
 
   body.appendChild(bubble);
   wrap.appendChild(avatar);
   wrap.appendChild(body);
   container.appendChild(wrap);
-  container.scrollTop = container.scrollHeight;
+  container.scrollTop = container.scrollHeight
 }
 
 function removeTyping() {
-  document.getElementById('typing-wrap')?.remove();
+  document.getElementById('typing-wrap')?.remove()
 }
 
 // ── Auto-resize textarea ───────────────────────────
-const chatInput = document.getElementById('chatInput');
+const chatInput = document.getElementById('chatInput')
 
 chatInput.addEventListener('input', () => {
   chatInput.style.height = 'auto';
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'
 });
 
 chatInput.addEventListener('keydown', e => {
@@ -118,7 +122,7 @@ chatInput.addEventListener('keydown', e => {
 });
 
 // ── Send chat message ──────────────────────────────
-const sendBtn = document.getElementById('sendBtn');
+const sendBtn = document.getElementById('sendBtn')
 
 async function sendMessage() {
   const msg = chatInput.value.trim();
@@ -286,4 +290,3 @@ async function startResearch() {
 
   researchBtn.disabled = false;
 }
-
