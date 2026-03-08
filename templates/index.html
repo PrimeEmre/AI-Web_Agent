@@ -3,12 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Chat UI</title>
     <link rel="stylesheet" href="/static/style.css">
-    <title>Document</title>
 </head>
 <body>
-    <button onclick="hello()">Click me</button>
-    
+
+    <div class="chat-container">
+        <div id="chat-window" class="chat-window">
+            <div class="welcome-screen">
+                <h1>What can I help you find?</h1>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="search-wrapper">
+                <input type="text" id="user-input" placeholder="Ask anything..." autocomplete="off">
+                <button id="send-btn">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/script.js"></script>
 </body>
 </html>
