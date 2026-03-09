@@ -9,17 +9,13 @@ from bs4 import BeautifulSoup
 import io
 from datetime import date
 
-# ── Research agent imports ────────────────────────────────────
-
-
 app = Flask(__name__)
 app.secret_key = "emre_ai_secret_123"
 
-# ── Your ElevenLabs API key ───────────────────────────────────
 ELEVENLABS_API_KEY = "sk_812e420469d5b43b470708397509e2242a9cd05796e32a6b"
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "gemma3n"
+MODEL = "gemma3n"  # change to "llama3.2" if you want better tool calling
 
 MAX_HISTORY = 20
 MAX_SEARCH_RESULTS = 4
@@ -35,19 +31,15 @@ SYSTEM_PROMPT = """You are Jarvis, a highly intelligent AI assistant. You:
 Today's date is: {date}
 """
 
-RESEARCH_SYSTEM_PROMPT = """You are an expert research assistant with access to web search tools.
+RESEARCH_SYSTEM_PROMPT = """You are an expert research assistant.
+Given research data from the web, write a comprehensive, well-structured report.
 
-Your task:
-1. Search the web to gather information on the given topic
-2. Fetch relevant pages to get more detail when needed
-3. Synthesize everything into a well-structured report
-
-Your final report MUST include:
-- Executive Summary
-- Key Findings (grouped by theme)
-- Important facts and statistics
-- Conclusion
-- Sources (list URLs used)
+Your report MUST include these sections:
+# Executive Summary
+# Key Findings
+# Important Facts & Statistics
+# Conclusion
+# Sources
 
 Use markdown formatting. Be thorough but concise."""
 
@@ -67,9 +59,10 @@ def save_history(user_id, history):
         json.dump(history, f)
 
 
-# ── Research agent tools ──────────────────────────────────────
+# ── Search tools ──────────────────────────────────────────────
 
 def web_search(query: str) -> str:
+    """Search DuckDuckGo and return results as text."""
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=MAX_SEARCH_RESULTS))
@@ -84,6 +77,7 @@ def web_search(query: str) -> str:
 
 
 def fetch_page(url: str) -> str:
+    """Fetch readable text from a URL."""
     try:
         headers = {"User-Agent": "Mozilla/5.0 (compatible; ResearchBot/1.0)"}
         resp = requests.get(url, headers=headers, timeout=8)
@@ -96,84 +90,69 @@ def fetch_page(url: str) -> str:
         return f"Could not fetch page: {e}"
 
 
-TOOLS = {
-    "web_search": {
-        "fn": web_search,
-        "spec": {
-            "type": "function",
-            "function": {
-                "name": "web_search",
-                "description": "Search the web using DuckDuckGo.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "The search query"}
-                    },
-                    "required": ["query"]
-                }
-            }
-        }
-    },
-    "fetch_page": {
-        "fn": fetch_page,
-        "spec": {
-            "type": "function",
-            "function": {
-                "name": "fetch_page",
-                "description": "Fetch and read the full text content of a web page by URL.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "url": {"type": "string", "description": "The full URL to fetch"}
-                    },
-                    "required": ["url"]
-                }
-            }
-        }
-    }
-}
-
-TOOL_SPECS = [t["spec"] for t in TOOLS.values()]
-
+# ── Research agent ────────────────────────────────────────────
 
 def run_research_agent(topic: str) -> str:
-    """Agentic loop — searches the web and writes a structured report."""
+    """
+    Searches the web manually, then asks the model to write a report.
+    This approach is more reliable than tool calling with gemma3n.
+    """
+    print(f"[Research] Searching: {topic}")
+
+    # Run 2 searches for broader coverage
+    search1 = web_search(topic)
+    search2 = web_search(topic + " latest news facts")
+
+    # Fetch the top result page for deeper content
+    page_content = ""
+    try:
+        with DDGS() as ddgs:
+            hits = list(ddgs.text(topic, max_results=1))
+        if hits:
+            page_content = fetch_page(hits[0]["href"])
+            print(f"[Research] Fetched page: {hits[0]['href']}")
+    except Exception as e:
+        print(f"[Research] Page fetch failed: {e}")
+
+    # Build the combined research context
+    context = f"""=== SEARCH RESULTS 1 ===
+{search1}
+
+=== SEARCH RESULTS 2 ===
+{search2}
+
+=== PAGE CONTENT ===
+{page_content}
+"""
+
+    # Ask the model to synthesize a report from the gathered data
     messages = [
         {"role": "system", "content": RESEARCH_SYSTEM_PROMPT},
-        {"role": "user", "content": f"Research this topic and write a comprehensive report: {topic}"}
+        {
+            "role": "user",
+            "content": (
+                f"Write a comprehensive research report on: **{topic}**\n\n"
+                f"Use this web research data as your source:\n\n{context}"
+            )
+        }
     ]
 
-    for _ in range(10):  # max iterations
-        payload = {
-            "model": MODEL,
-            "messages": messages,
-            "tools": TOOL_SPECS,
-            "stream": False
-        }
-        resp = requests.post(OLLAMA_URL, json=payload, timeout=120)
-        resp.raise_for_status()
-        msg = resp.json().get("message", {})
-        messages.append(msg)
+    payload = {
+        "model": MODEL,
+        "messages": messages,
+        "stream": False,
+        "options": {"temperature": 0.4, "top_p": 0.9}
+    }
 
-        tool_calls = msg.get("tool_calls", [])
-
-        if not tool_calls:
-            return msg.get("content", "No report generated.")
-
-        for call in tool_calls:
-            fn_name = call["function"]["name"]
-            fn_args = call["function"].get("arguments", {})
-            result = TOOLS[fn_name]["fn"](**fn_args) if fn_name in TOOLS else f"Unknown tool: {fn_name}"
-            messages.append({"role": "tool", "content": result})
-
-    return "Research timed out after maximum iterations."
+    resp = requests.post(OLLAMA_URL, json=payload, timeout=180)
+    resp.raise_for_status()
+    return resp.json().get("message", {}).get("content", "No report generated.")
 
 
 # ── Routes ────────────────────────────────────────────────────
 
 @app.route("/")
 def home():
-    session["history"] = []
     session.setdefault("user_id", os.urandom(8).hex())
     return render_template("index.html")
 
@@ -202,7 +181,6 @@ def chat():
         ai_message = result["message"]["content"]
 
         history.append({"role": "assistant", "content": ai_message})
-        session["history"] = history
         save_history(user_id, history)
 
         return jsonify({"response": ai_message})
@@ -213,7 +191,6 @@ def chat():
 
 @app.route("/research", methods=["POST"])
 def research():
-    """New endpoint — runs the full research agent on a topic."""
     topic = request.json.get("topic", "").strip()
     if not topic:
         return jsonify({"error": "No topic provided"}), 400
@@ -221,22 +198,21 @@ def research():
     try:
         report = run_research_agent(topic)
 
-        # Optionally save the report to disk
         os.makedirs("reports", exist_ok=True)
         safe = "".join(c if c.isalnum() or c in " -_" else "" for c in topic)
         filename = f"reports/{safe[:40].replace(' ','_')}_{date.today()}.md"
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(f"# {topic}\n\n{report}")
 
         return jsonify({"topic": topic, "report": report, "saved_to": filename})
 
     except Exception as e:
+        print(f"[Research ERROR] {e}")
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/research/list", methods=["GET"])
 def list_reports():
-    """Returns a list of all saved research reports."""
     files = []
     if os.path.exists("reports"):
         files = sorted(os.listdir("reports"), reverse=True)
@@ -255,7 +231,6 @@ def speak():
 
     try:
         client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-
         audio = client.text_to_speech.convert(
             voice_id=voice_id,
             text=text,
