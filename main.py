@@ -12,7 +12,7 @@ from datetime import date
 app = Flask(__name__)
 app.secret_key = "emre_ai_secret_123"
 
-ELEVENLABS_API_KEY = "sk_812e420469d5b43b470708397509e2242a9cd05796e32a6b"
+ELEVENLABS_API_KEY = "your API"
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma3n"  # change to "llama3.2" if you want better tool calling
